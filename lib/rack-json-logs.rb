@@ -146,10 +146,10 @@ module Rack
         type_arr = type.split('.') if type.is_a?(String)
         raise "Must have atleast one level of event in #{ type }" if type_arr.empty?
         the_event = @events
-        type_arr[:-1].each do |path_element|
+        type_arr[0..-2].each do |path_element|
           the_event[path_element] ||= {}
           the_event = the_event[path_element]
-        end
+        end if type_arr.length > 1
         the_event[type_arr.last] = value
       end
     end
