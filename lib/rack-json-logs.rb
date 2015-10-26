@@ -76,7 +76,8 @@ module Rack
       end
 
       # restore output IOs
-      $stderr = previous_stderr; $stdout = previous_stdout
+      $stderr = previous_stderr
+      $stdout = previous_stdout
       if @options[:logstash_json]
         request = Rack::Request.new(env)
         clean_session = clean_session_for_log(request.session)
@@ -104,8 +105,8 @@ module Rack
         request:  "#{env['REQUEST_METHOD']} #{env['PATH_INFO']}",
         status:   status || 500,
         from:     @options[:from],
-      #  stdout:   stdout_buffer.string,
-      #  stderr:   stderr_buffer.string
+        stdout:   stdout_buffer.string,
+        stderr:   stderr_buffer.string
       })
       log[:events] =  logger.events if logger.used
       if exception
@@ -134,8 +135,7 @@ module Rack
       attr_reader :events, :used
 
       def initialize(start_time)
-        @start_time = start_time
-        @events     = []
+        @events     = {}
         @used       = false
       end
 
@@ -143,11 +143,14 @@ module Rack
       #
       def log(type, value)
         @used = true
-        @events << {
-          type:  type,
-          value: value,
-          time:  (Time.now - @start_time).round(3)
-        }
+        type_arr = type.split('.') if type.is_a?(String)
+        raise "Must have atleast one level of event in #{ type }" if type_arr.empty?
+        the_event = @events
+        type_arr[:-1].each do |path_element|
+          the_event[path_element] ||= {}
+          the_event = the_event[path_element]
+        end
+        the_event[type_arr.last] = value
       end
     end
   end
