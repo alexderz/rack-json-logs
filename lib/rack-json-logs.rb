@@ -32,6 +32,11 @@ module Rack
   #     When :pretty_print is set to true, these options will be passed to the
   #     pretty-printer. Run `json-logs-pp -h` to see what the options are.
   #
+  #   :logstash_format
+  #
+  #     When :logstash_format is set, the log format is adjust to be the native
+  #     format Logstash expects customized for Gravitant.
+  #
   class JsonLogs
 
     def initialize(app, options={})
@@ -40,6 +45,7 @@ module Rack
         reraise_exceptions: false,
         pretty_print:       false,
         print_options:      {trace: true},
+        logstash_json:    false,
       }.merge(options)
       @options[:from] ||= Socket.gethostname
     end
@@ -53,23 +59,43 @@ module Rack
       env = env.dup; env[:logger] = logger
 
       begin
-        response = @app.call(env)
+        [status, headers, response] = @app.call(env)
       rescue Exception => e
         exception = e
       end
 
+
       # restore output IOs
       $stderr = previous_stderr; $stdout = previous_stdout
+      if @options[:logstash_json]
+        log_line = {
+          "@timestamp" => start_time.utc.iso8601,
+          "@message" => {
+            host:            Socket.gethotname,
+            uri:             env['PATH_INFO'],
+            request_method:  env['REQUEST_METHOD'],
+            body_bytes_sent: header['Content-Length'] || 0,
+            http_user_agent: env['HTTP_USER_AGENT'],
+            remote_addr:     env['HTTP_X_FORWARDED_FOR'] || env['REMOTE_ADDR'],
+            uid:             nil
 
-      log = {
-        time:     start_time.to_i,
+
+          }
+        }
+        log = log_line["@message"]
+      else
+          log_line =  log = {
+          time:     start_time.to_i
+        }
+      end
+      log.merge({
         duration: (Time.now - start_time).round(3),
         request:  "#{env['REQUEST_METHOD']} #{env['PATH_INFO']}",
-        status:   (response || [500]).first,
+        status:   (status || [500]).first,
         from:     @options[:from],
         stdout:   stdout_buffer.string,
         stderr:   stderr_buffer.string
-      }
+      })
       log[:events] =  logger.events if logger.used
       if exception
         log[:exception] = {
@@ -79,10 +105,10 @@ module Rack
       end
 
       if @options[:pretty_print]
-        JsonLogs.pretty_print(JSON.parse(log.to_json),
+        JsonLogs.pretty_print(JSON.parse(log_line.to_json),
                               STDOUT, @options[:print_options])
       else
-        STDOUT.puts(log.to_json)
+        STDOUT.puts(log_line.to_json)
       end
 
       raise exception if exception && @options[:reraise_exceptions]
@@ -120,4 +146,3 @@ module Rack
     end
   end
 end
-
