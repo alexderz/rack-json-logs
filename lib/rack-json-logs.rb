@@ -39,7 +39,7 @@ module Rack
   #
   class JsonLogs
 
-    def initialize(app, options={})
+    def initialize(app, output=nil, options={})
       @app = app
       @options = {
         reraise_exceptions: false,
@@ -48,9 +48,20 @@ module Rack
         logstash_json:    false,
       }.merge(options)
       @options[:from] ||= Socket.gethostname
+      @output = output || $stdout
     end
 
+    def clean_session_for_log(session)
+      clean_session = session.to_hash.dup
+      clean_session.delete("session_id")
+      clean_session.delete("access_token")
+      clean_session
+    end
+
+
+
     def call(env)
+
       start_time = Time.now
       $stdout, previous_stdout = (stdout_buffer = StringIO.new), $stdout
       $stderr, previous_stderr = (stderr_buffer = StringIO.new), $stderr
@@ -59,27 +70,27 @@ module Rack
       env = env.dup; env[:logger] = logger
 
       begin
-        [status, headers, response] = @app.call(env)
+        status, headers, response = @app.call(env)
       rescue Exception => e
         exception = e
       end
 
-
       # restore output IOs
       $stderr = previous_stderr; $stdout = previous_stdout
       if @options[:logstash_json]
+        request = Rack::Request.new(env)
+        clean_session = clean_session_for_log(request.session)
         log_line = {
           "@timestamp" => start_time.utc.iso8601,
           "@message" => {
-            host:            Socket.gethotname,
-            uri:             env['PATH_INFO'],
-            request_method:  env['REQUEST_METHOD'],
-            body_bytes_sent: header['Content-Length'] || 0,
-            http_user_agent: env['HTTP_USER_AGENT'],
+            host:            Socket.gethostname,
+            uri:             request.path_info,
+            request_method:  request.request_method,
+            body_bytes_sent: headers && headers['Content-Length'] || 0,
+            http_user_agent: request.user_agent,
             remote_addr:     env['HTTP_X_FORWARDED_FOR'] || env['REMOTE_ADDR'],
-            uid:             nil
-
-
+            uid:             request.cookies['uid'],
+            session:         clean_session
           }
         }
         log = log_line["@message"]
@@ -88,13 +99,13 @@ module Rack
           time:     start_time.to_i
         }
       end
-      log.merge({
+      log.merge!({
         duration: (Time.now - start_time).round(3),
         request:  "#{env['REQUEST_METHOD']} #{env['PATH_INFO']}",
-        status:   (status || [500]).first,
+        status:   status || 500,
         from:     @options[:from],
-        stdout:   stdout_buffer.string,
-        stderr:   stderr_buffer.string
+      #  stdout:   stdout_buffer.string,
+      #  stderr:   stderr_buffer.string
       })
       log[:events] =  logger.events if logger.used
       if exception
@@ -106,21 +117,16 @@ module Rack
 
       if @options[:pretty_print]
         JsonLogs.pretty_print(JSON.parse(log_line.to_json),
-                              STDOUT, @options[:print_options])
+                            @output, @options[:print_options])
       else
-        STDOUT.puts(log_line.to_json)
+        @output.puts(log_line.to_json)
       end
+      @output.flush if @output.respond_to?("flush")
 
       raise exception if exception && @options[:reraise_exceptions]
+      [status, headers, response]
 
-      response || response_500
     end
-
-    def response_500
-      [500, {'Content-Type' => 'application/json'},
-       [{status: 500, message: 'Something went wrong...'}.to_json]]
-    end
-
 
     # This class can be used to log arbitrary events to the request.
     #
