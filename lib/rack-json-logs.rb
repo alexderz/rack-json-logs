@@ -111,10 +111,7 @@ module Rack
       })
       if logger.used
         log[:events] =  logger.events 
-        log[:all_events] = []
-        logger.events.each do |e,v|
-          log[:all_events] << e if v
-        end
+        log[:all_events] = logger.all_events
       end
       if exception
         log[:exception] = {
@@ -139,18 +136,25 @@ module Rack
     # This class can be used to log arbitrary events to the request.
     #
     class EventLogger
-      attr_reader :events, :used
+      attr_reader :events, :used, :all_events
 
       def initialize(start_time)
         @events     = {}
         @used       = false
+        @all_events = []
       end
 
       # Log an event of type `type` and value `value`.
       #
       def log(type, value)
         @used = true
-        type_arr = type.split('.') if type.is_a?(String)
+        if type.is_a?(String)
+          @all_events << type
+          type_arr = type.split('.') 
+        else
+          type_arr = type
+          @all_events << type.join('.')
+        end
         raise "Must have atleast one level of event in #{ type }" if type_arr.empty?
         the_event = @events
         type_arr[0..-2].each do |path_element|
