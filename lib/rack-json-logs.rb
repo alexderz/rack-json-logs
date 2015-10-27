@@ -109,7 +109,13 @@ module Rack
         stdout:   stdout_buffer.string,
         stderr:   stderr_buffer.string
       })
-      log[:events] =  logger.events if logger.used
+      if logger.used
+        log[:events] =  logger.events 
+        log[:all_events] = []
+        logger.events.each do |e,v|
+          log[:all_events] << e if v
+        end
+      end
       if exception
         log[:exception] = {
           message:   exception.message,
