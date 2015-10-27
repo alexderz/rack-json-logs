@@ -83,7 +83,7 @@ module Rack
         clean_session = clean_session_for_log(request.session)
         log_line = {
           "@timestamp" => start_time.utc.iso8601,
-          "@message" => {
+          "@fields" => {
             host:            Socket.gethostname,
             uri:             request.path_info,
             request_method:  request.request_method,
