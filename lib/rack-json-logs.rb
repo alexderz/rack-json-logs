@@ -78,11 +78,12 @@ module Rack
       # restore output IOs
       $stderr = previous_stderr
       $stdout = previous_stdout
+      log = nil
       if @options[:logstash_json]
         request = Rack::Request.new(env)
         clean_session = clean_session_for_log(request.session)
         log_line = {
-          "@timestamp" => start_time.utc.iso8601,
+          "@timestamp" => start_time.iso8602,
           "@fields" => {
             host:            Socket.gethostname,
             uri:             request.path_info,
@@ -94,9 +95,9 @@ module Rack
             session:         clean_session
           }
         }
-        log = log_line["@message"]
+        log = log_line["@fields"]
       else
-          log_line =  log = {
+          log_line = log = {
           time:     start_time.to_i
         }
       end
