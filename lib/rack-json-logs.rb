@@ -83,7 +83,7 @@ module Rack
         request = Rack::Request.new(env)
         clean_session = clean_session_for_log(request.session)
         log_line = {
-          "@timestamp" => start_time.iso8602,
+          "@timestamp" => start_time.iso8601,
           "@fields" => {
             host:            Socket.gethostname,
             uri:             request.path_info,
