@@ -61,10 +61,12 @@ module Rack
 
 
     def call(env)
+      binding.pry
+      dev_mode = ENV['RACK_ENV'] == "development"
 
       start_time = Time.now
-      $stdout, previous_stdout = (stdout_buffer = StringIO.new), $stdout
-      $stderr, previous_stderr = (stderr_buffer = StringIO.new), $stderr
+      $stdout, previous_stdout = (stdout_buffer = StringIO.new), $stdout unless dev_mode
+      $stderr, previous_stderr = (stderr_buffer = StringIO.new), $stderr unless dev_mode
 
       logger = EventLogger.new(start_time)
       env = env.dup; env[:logger] = logger
@@ -76,8 +78,8 @@ module Rack
       end
 
       # restore output IOs
-      $stderr = previous_stderr
-      $stdout = previous_stdout
+      $stderr = previous_stderr unless dev_mode
+      $stdout = previous_stdout unless dev_mode
       log = nil
       if @options[:logstash_json]
         request = Rack::Request.new(env)
@@ -105,12 +107,14 @@ module Rack
         duration: (Time.now - start_time).round(3),
         request:  "#{env['REQUEST_METHOD']} #{env['PATH_INFO']}",
         status:   status || 500,
-        from:     @options[:from],
-        stdout:   stdout_buffer.string,
-        stderr:   stderr_buffer.string
+        from:     @options[:from]
       })
+
+      log[:stdout] = stdout_buffer.string unless dev_mode
+      log[:stderr] = stderr_buffer.string unless dev_mode
+
       if logger.used
-        log[:events] =  logger.events 
+        log[:events] =  logger.events
         log[:all_events] = logger.all_events
       end
       if exception
@@ -150,7 +154,7 @@ module Rack
         @used = true
         if type.is_a?(String)
           @all_events << type
-          type_arr = type.split('.') 
+          type_arr = type.split('.')
         else
           type_arr = type
           @all_events << type.join('.')
