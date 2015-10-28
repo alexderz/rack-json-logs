@@ -61,7 +61,6 @@ module Rack
 
 
     def call(env)
-      binding.pry
       dev_mode = ENV['RACK_ENV'] == "development"
 
       start_time = Time.now
