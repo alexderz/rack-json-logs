@@ -11,6 +11,7 @@ opts = Trollop.options do
   opt :trace,    'Print full backtraces.',  default: false, short: 'b'
   opt :duration, 'Print request duration.', default: true,  short: 'd'
   opt :events,   'Print events.',           default: false, short: 'v'
+  opt :session,  'Print session data.',     default: false, short: 's'
 end
 
 STDOUT.sync = true
@@ -25,9 +26,14 @@ while line = STDIN.gets
   json = JSON.parse(line) rescue nil
 
   json = json['data'] if json && json['data']
+  if json['@fields']
+    ts = json['@timestamp']
+    json = json['@fields']
+    json['time'] = ts
+  end
 
   # only pretty print valid objects
-  if json && json.is_a?(Hash) && json['request']
+  if json && json.is_a?(Hash) 
     Rack::JsonLogs.pretty_print(json, STDOUT, opts)
   else
     puts line

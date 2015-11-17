@@ -64,7 +64,7 @@ module Rack
       dev_mode = ENV['RACK_ENV'] == "development"
 
       start_time = Time.now
-      $stdout, previous_stdout = (stdout_buffer = StringIO.new), $stdout unless dev_mode
+      $stdout, previous_stdout = (stdout_buffer = Strin gIO.new), $stdout unless dev_mode
       $stderr, previous_stderr = (stderr_buffer = StringIO.new), $stderr unless dev_mode
 
       logger = EventLogger.new(start_time)

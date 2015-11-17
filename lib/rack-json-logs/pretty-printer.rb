@@ -1,5 +1,7 @@
 require 'colorize'
+require 'time'
 require 'stringio'
+require 'pp'
 
 module Rack
   class JsonLogs
@@ -34,7 +36,7 @@ module Rack
       out.puts "Request: #{json['request']}".cyan
       out.puts resp.send(status_color)
       out.puts "From: #{json['from']}".cyan if opts[:from] && json['from']
-      out.puts "At: #{Time.at(json['time']).strftime('%b %-e %Y, %-l:%M%P')}"
+      out.puts "At: #{Time.parse(json['time']).strftime('%b %-e %Y, %-l:%M%P')}"
       out.puts
 
       %w{stdout stderr}.each do |b|
@@ -50,15 +52,13 @@ module Rack
         # Typically log statements start end with a \n, so skiping puts here.
       end
 
+      if opts[:session] && json["session"] && !json["session"].empty?
+        out.puts "Session: #{PP.pp(json['session'], "")}".cyan
+      end
+
+
       if opts[:events] && json['events'] && !json['events'].empty?
-        out.puts 'Events:'.cyan
-        out.puts
-        json['events'].each do |e|
-          out.puts "Event: #{e['type']}"
-          out.puts "At: #{(e['time']*1000).round}ms"
-          out.puts "Value: #{e['value'].to_json}"
-          out.puts
-        end
+        out.puts "Events: #{PP.pp(json['events'], "")}".cyan
       end
 
       if json['exception']
