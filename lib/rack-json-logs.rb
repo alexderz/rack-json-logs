@@ -86,14 +86,16 @@ module Rack
         log_line = {
           "@timestamp" => start_time.iso8601,
           "@fields" => {
-            host:            Socket.gethostname,
+            hostname:        Socket.gethostname,
+            host:            request.host,
             uri:             request.path_info,
             request_method:  request.request_method,
             body_bytes_sent: headers && headers['Content-Length'] || 0,
             http_user_agent: request.user_agent,
             remote_addr:     env['HTTP_X_FORWARDED_FOR'] || env['REMOTE_ADDR'],
             uid:             request.cookies['uid'],
-            session:         clean_session
+            session:         clean_session,
+            rack_env:        ENV['RACK_ENV']
           }
         }
         log = log_line["@fields"]
